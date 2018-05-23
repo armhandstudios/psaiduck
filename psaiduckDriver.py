@@ -1,3 +1,8 @@
+# The purpose of this class is to interact directly with the components of Pokemon Showdown and its Pokedex
+# All methods that function data already obtained, or that merely use the drivers to check elemeents of the page for
+# readiness, shall be grouped into HelperFunctions for added readability and to allow other classes to import them
+# without import loops
+
 #Imports
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -9,30 +14,11 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
 import time
 from PokemonClasses import *
+from BattleStyle import *
 import random
 import json
+from HelperFunctions import *
 
-
-def elementExists(driver, xpath):
-    driver.implicitly_wait(0)
-    try:
-        driver.find_element_by_xpath(xpath)
-    except NoSuchElementException:
-        driver.implicitly_wait(10)
-        return False
-    driver.implicitly_wait(10)
-    return True
-
-def actionSucceeded(driver):
-    if elementExists(driver, ".//div[@class='whatdo']"):
-        return False
-    else:
-        return True
-
-def printBothActiveMons(me, scrub):
-    print("printBothActiveMons")
-    print(me.getActive().name)
-    print(scrub.getActive().name)
 
 def opponentsName(driver):
     return driver.find_element_by_xpath(".//div[@class='rightbar']/div[1]").text
@@ -111,7 +97,10 @@ def login(driver, username, password):
 def getActiveMoves(driver):
     moves = []
     for x in range(4):
-        moveButton = driver.find_element_by_xpath(".//div[@class='movemenu']/button[{}]".format(x + 1))
+        if elementExists(driver, ".//div[@class='movemenu']/button[{}]".format(x + 1)):
+            moveButton = driver.find_element_by_xpath(".//div[@class='movemenu']/button[{}]".format(x + 1))
+        elif elementExists(driver, ".//div[@class='movebuttons-noz']/button[{}]"):
+            moveButton = driver.find_element_by_xpath(".//div[@class='movebuttons-noz']/button[{}]".format(x + 1))
         hover = ActionChains(driver).move_to_element(moveButton)
         hover.perform()
         moveName = driver.find_element_by_xpath(".//div[@id='tooltipwrapper']/div/div/h2").text
@@ -128,8 +117,8 @@ def getBenchedMoves(driver, infoDriver):
     moves = []
     movesListText = driver.find_element_by_xpath(".//div[@id='tooltipwrapper']/div/div/p[4]").text
     movesList = movesListText.splitlines()
-    for x in range(4):
-        moveName = movesList[x][2:].strip()
+    for x in movesList:
+        moveName = x[2:].strip()
         moves.append((getMoveInfo(infoDriver, moveName)))
     return moves
 
@@ -223,24 +212,25 @@ def debugPopup(driver):
             print("{} is not there".format(x))
 
 #checks whatdo's existence to handle picking invalid attack (i.e. choice band, encore, taunt)
-def makeMove(driver, me, scrub):
+def makeMove(driver, me, scrub, battleStyle):
     #buffer in case actions not available yet
     while actionSucceeded(driver):
         time.sleep(1)
-    while not actionSucceeded(driver):
-        #maxDamage = 0
-        #for x in range(4):
-            #calculate move damage
-        if "choice" in me.getActive().item.lower() and me.getActive().lastUsedMove is not None:
-            moveNumber = me.getActive().moves.index(me.getActive().lastUsedMove)
-        else:
-            moveNumber = random.randint(0,3)
-        if attack(driver, me.getActive().moves[moveNumber]):
-            me.getActive().useMove(me.getActive().moves[moveNumber])
-        print("attacked with move {} ({})".format(moveNumber, me.getActive().moves[moveNumber].name))
+    for x in range(10):
+        if actionSucceeded(driver):
+            break
+        useMove = battleStyle.makeMove(me, scrub)
+        attack(driver, useMove)
         time.sleep(1)
+    while not actionSucceeded(driver): #will not go through this if previous attempt succeeded
+        useMove = randomMakeMove(me, scrub)
+        attack(driver, useMove)
+        time.sleep(1)
+    print("attacked with move {}".format(useMove.name))
+    time.sleep(1)
 
-def waitForNextTurn(driver, infoDriver, me, scrub, bs):
+def waitForNextTurn(driver, infoDriver, me, scrub, bs, battleStyle):
+    triedSwitching = False
     while not elementExists(driver, ".//div[@class='battle-log']/div[2]/h2[{}]".format(bs.turn+1)):
         #did game end?
         if isGameOver(driver):
@@ -250,10 +240,11 @@ def waitForNextTurn(driver, infoDriver, me, scrub, bs):
             #did a pokemon die?
             whatHappened(driver, infoDriver, me, scrub, bs)
             #switch the next pokemon, make this random ffs
-            if me.remainingPokemon()[0].active:
-                mon = me.remainingPokemon()[1]
+            if triedSwitching:
+                mon = randomMakeSwitch(me, scrub)
             else:
-                mon = me.remainingPokemon()[0]
+                mon = battleStyle.makeSwitch(me, scrub)
+                triedSwitching = True
             switch(driver, me, mon)
         time.sleep(1)
     bs.turn += 1
@@ -282,11 +273,6 @@ def whatHappened(driver, infoDriver, me, scrub, bs):
         bs.lastTurnIndex += 1
     return
 
-def isGameOver(driver):
-    if elementExists(driver, ".//button[@name='closeAndRematch']"):
-        return True
-    return False
-
 #do later
 def turnOffTheFuckingMusic(driver):
     driver.find_element_by_name("openSounds").click()
@@ -299,33 +285,13 @@ def turnOffTheFuckingMusic(driver):
     return
 
 
-def attack(driver, move):
-    #if elementExists(driver, ".//div[@class='movemenu']/button[{}]".format(moveNumber + 1)):
-        #driver.find_element_by_xpath(".//div[@class='movemenu']/button[{}]".format(moveNumber + 1)).click()
-    #elif elementExists(driver, ".//div[@class='movebuttons-noz']/button[{}]".format(moveNumber + 1)):
-       #driver.find_element_by_xpath(".//div[@class='movebuttons-noz']/button[{}]".format(moveNumber + 1)).click()
-    if elementExists(driver, ".//button[@data-move='{}']".format(move.name)):
-        driver.find_element_by_xpath(".//button[@data-move='{}']".format(move.name)).click()
-    if actionSucceeded(driver):
-        return True
-    else:
-        return False
-
-#perform a likely valid switch
-def switch(driver, trainer, pkmn):
-    driver.find_element_by_xpath(".//button[@name='chooseSwitch' and text()[contains(., '{}')]]".format(pkmn.nickname)).click()
-    if actionSucceeded(driver):
-        trainer.switch(pkmn)
-        return True
-    else:
-        return False
-
 class BattleState:
     def __init__(self):
         self.turn = 1
         self.lastTurnIndex = 3
 
-def battle(driver, infoDriver):
+
+def battle(driver, infoDriver, battleStyle):
     me = Trainer()
     scrub = Trainer()
     bs = BattleState()
@@ -335,32 +301,17 @@ def battle(driver, infoDriver):
     #print(scrub)
     while not isGameOver(driver): #need to elegantly check this in steps
         #printBothActiveMons(me, scrub)
-        makeMove(driver, me, scrub)
-        waitForNextTurn(driver, infoDriver, me, scrub, bs)
+        makeMove(driver, me, scrub, battleStyle)
+        waitForNextTurn(driver, infoDriver, me, scrub, bs, battleStyle)
         whatHappened(driver, infoDriver, me, scrub, bs)
 
-#maybe let this file get run by another?
-#lastTurnIndex = 3
-#try:
-#    with open('psai_settings.json') as json_data:
-#        data = json.load(json_data)
-#    username = data['username']
-#    password = data['password']
-#    challengeUsername = data['challengeUser']
-#    battleMode = data['battleMode']
-#except:
-#    username = 'insertUsernameHere'
-#    password = 'insertPasswordHere'
-#    challengeUsername = 'insertChallengeUserHere'
-#    battleMode = 'accept'
-#infoDriver = getDriver()
-#driver = getDriver()
-#login(driver, username, password)
-#turnOffTheFuckingMusic()
-#challengeUser(driver, challengeUsername)
-#battle(driver)
-#infoDriver.close()
-#driver.close()
+def getBattleStyle(key):
+    styleDictionary = {
+        'random':getRandomBattleStyle,
+        'basic':getBtaBattleStyle
+    }
+    return styleDictionary.get(key)()
+
 
 #this is gonna be a lot of refactoring...
 def run(filename):
@@ -368,6 +319,7 @@ def run(filename):
     password = 'insertPasswordHere'
     challengeUsername = 'insertChallengeUserHere'
     battleMode = 'accept'
+    battleStyleKey = 'random'
     try:
         with open(filename) as json_data:
             data = json.load(json_data)
@@ -375,9 +327,10 @@ def run(filename):
         password = data['password']
         challengeUsername = data['challengeUser']
         battleMode = data['battleMode']
+        battleStyleKey = data['battleStyle']
     except Exception as e:
         print("Error importing: {}".format(e))
-
+    battleStyle = getBattleStyle(battleStyleKey)
     infoDriver = getDriver()
     driver = getDriver()
     login(driver, username, password)
@@ -386,7 +339,7 @@ def run(filename):
         acceptChallenge(driver)
     if battleMode == "challenge":
         challengeUser(driver, challengeUsername)
-    battle(driver, infoDriver)
+    battle(driver, infoDriver, battleStyle)
     infoDriver.close()
     driver.close()
 
@@ -394,3 +347,4 @@ def run(filename):
 #todo: 1 atk pkmn
 #todo: track megas somehow
 #todo: battle styles
+#todo: taunts
