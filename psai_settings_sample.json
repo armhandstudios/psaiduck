@@ -3,5 +3,5 @@
 	"password": "Password1",
 	"challengeUser": "SomeOtherUsername",
 	"battleMode": "challenge",
-	"battleStyle": "random"
+	"battleStyle": "basic"
 }

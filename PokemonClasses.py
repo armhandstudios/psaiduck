@@ -1,5 +1,3 @@
-from typing import List, Any, Union
-
 #not used atm don't play yaself
 class HeldItem:
 
@@ -16,9 +14,10 @@ class Move:
         self.power = pow
         self.accuracy = acc
         #effects = []    #list of tuples of effect/chance pairs
+        #print(self)
 
     def __str__(self):
-        return self.name
+        return "{}, {}, {}, {}, {}".format(self.name, self.type, self.cat, self.power, self.accuracy)
 
     def printFullInfo(self):
         print(self.name)
@@ -27,6 +26,7 @@ class Move:
         print(self.accuracy)
         print(self.cat)
 
+    #prolly wanna change params to just 1 pokemon rather than typename and 2 ptypes
     def effectiveness(self, movetype, ptype1, ptype2):
         typeIndices = ["normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison", "ground", "flying",
                        "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy"]
@@ -86,6 +86,63 @@ class Pokemon:
 
     def useMove(self, move):
         self.lastUsedMove = move
+
+    def getEffectivePower(self, move):
+        if move.type == self.type1 or move.type == self.type2:
+            print(move.power)
+            return float(move.power) * 1.5
+        else:
+            return float(move.power)
+
+    #returns two values, the first is how effective you are against the opponent, the second is how effective it is against you
+    #picks the max offensive types
+    def monMatchup(self, opponent):
+        typeIndices = ["normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison", "ground", "flying",
+                       "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy"]
+        typeMatchups = [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, .5, 0, 1, 1, .5, 1],
+                        [1, .5, .5, 1, 2, 2, 1, 1, 1, 1, 1, 2, .5, 1, .5, 1, 2, 1],
+                        [1, 2, .5, 1, .5, 1, 1, 1, 2, 1, 1, 1, 2, 1, .5, 1, 1, 1],
+                        [1, 1, 2, .5, .5, 1, 1, 1, 0, 2, 1, 1, 1, 1, .5, 1, 1, 1],
+                        [1, .5, 2, 1, .5, 1, 1, .5, 2, .5, 1, .5, 2, 1, .5, 1, .5, 1],
+                        [1, .5, .5, 1, 2, .5, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, .5, 1],
+                        [2, 1, 1, 1, 1, 2, 1, .5, 1, .5, .5, .5, 2, 0, 1, 2, 2, .5],
+                        [1, 1, 1, 1, 2, 1, 1, .5, .5, 1, 1, 1, .5, .5, 1, 1, 0, 2],
+                        [1, 2, 1, 2, .5, 1, 1, 2, 1, 0, 1, .5, 2, 1, 1, 1, 2, 1],
+                        [1, 1, 1, .5, 2, 1, 2, 1, 1, 1, 1, 2, .5, 1, 1, 1, .5, 1],
+                        [1, 1, 1, 1, 1, 1, 2, 2, 1, 1, .5, 1, 1, 1, 1, 0, .5, 1],
+                        [1, .5, 1, 1, 2, 1, .5, .5, 1, .5, 2, 1, 1, .5, 1, 2, .5, .5],
+                        [1, 2, 1, 1, 1, 2, .5, 1, .5, 2, 1, 2, 1, 1, 1, 1, .5, 1],
+                        [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, .5, 1, 1],
+                        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, .5, 0],
+                        [1, 1, 1, 1, 1, 1, .5, 1, 1, 1, 2, 1, 1, 2, 1, .5, 1, .5],
+                        [1, .5, .5, .5, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, .5, 2],
+                        [1, .5, 1, 1, 1, 1, 2, .5, 1, 1, 1, 1, 1, 1, 2, 2, .5, 1]]
+        #maxEffectiveness = 0
+        #maxOppEffectiveness = 0
+        #check first type matchup against opponents types
+        maxEffectiveness = typeMatchups[typeIndices.index(self.type1.lower())][typeIndices.index(opponent.type1.lower())]
+        if opponent.type2 is not None:
+            maxEffectiveness *= typeMatchups[typeIndices.index(self.type1.lower())][typeIndices.index(opponent.type2.lower())]
+        if self.type2 is not None:
+            curEffectiveness = typeMatchups[typeIndices.index(self.type1.lower())][typeIndices.index(opponent.type1.lower())]
+            if opponent.type2 is not None:
+                curEffectiveness *= typeMatchups[typeIndices.index(self.type1.lower())][typeIndices.index(opponent.type2.lower())]
+            if curEffectiveness > maxEffectiveness:
+                maxEffectiveness = curEffectiveness
+
+        maxOppEffectiveness = typeMatchups[typeIndices.index(opponent.type1.lower())][typeIndices.index(self.type1.lower())]
+        if self.type2 is not None:
+            maxOppEffectiveness *= typeMatchups[typeIndices.index(opponent.type1.lower())][typeIndices.index(self.type2.lower())]
+        if opponent.type2 is not None:
+            curEffectiveness = typeMatchups[typeIndices.index(opponent.type1.lower())][typeIndices.index(self.type1.lower())]
+            if self.type2 is not None:
+                curEffectiveness *= typeMatchups[typeIndices.index(opponent.type1.lower())][typeIndices.index(self.type2.lower())]
+            if curEffectiveness > maxOppEffectiveness:
+                maxOppEffectiveness = curEffectiveness
+
+        return maxEffectiveness, maxOppEffectiveness
+
+
 
 
 class FieldSide:
