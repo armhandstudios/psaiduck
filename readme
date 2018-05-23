@@ -7,20 +7,25 @@ The JSON file requires four parameters to function properly:
         a) "challenge" - you want psaiduck to challenge challengeUser to a battle
         b) "accept" - you want psaiduck to wait for a user (doesn't have to be challengeUser) to
                       challenge psaiduck to a battle, and accept when the challenge request is recieved.
-                      
-You may notice the sample JSON file includes a "battleStyle" attribute. That will be implemented soon.
+    5) battleStyle - currently supports "random" and "basic" values. Read more below
+    
+You may notice the sample JSON file includes a "battleStyle" attribute. Currently implemented are "random", which does everything
+    randomly, and "basic", which attacks with the move that would deal the most base damage, and switches to whatever pokemon would
+    be strongest against the opposing pokemon. Battle styles are defined by:
+        -Adding a getMyBattleStyle() method, a myMakeMove(trainerSelf, trainerEnemy) method, and a myMakeSwitch method.
+            the getMyBattleStyle method needs only to return BattleStyle(myMakeMove, mySwitchMove). The other two methods need
+            to return the move or pokemon it wants to make/switch to.
+        -In psaiduckDriver, add the key to be placed in the json settings file you wish to correspond to your battle style, and 
+            the name of your getMyBattleStyle method
 
 The battle currently follows this flow:
   -psaiduck collects information about own active pokemon, then own benched pokemon
   -psaiduck collects information about opponents active pokemon
-  -psaiduck randomly attacks
-  -psaiduck waits for the next turn. If a switch is needed, psaiduck switches to the next pokemon
+  -psaiduck attacks
+  -psaiduck waits for the next turn. If a switch is needed, psaiduck switches to a different pokemon
   -repeat until game ends, then close
 
 Known Bugs:
--Crashes when trying to collect information about own pokemon that don't have 4 attacks (e.g. ditto, unown)
 -Cannot track forced switches (e.g. roar, whirlwind). Will not crash, and will continue to work properly if manually
   changed back to mon that was forced out
 
-Known Limitations:
--Currently can only perform random actions, and thusly is really dumb.
